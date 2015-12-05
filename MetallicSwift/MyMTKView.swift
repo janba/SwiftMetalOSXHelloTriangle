@@ -17,9 +17,9 @@ class MyMTKView: MTKView
     var pipeline_state: MTLRenderPipelineState! = nil // the state constitute by shader programs
     var vertex_buffer: MTLBuffer! = nil               // Buffer for on-device storage
     let vertex_data:[Float] = [                       // Actual triangle data
-        -1.0, -1.0, 0.0,
-        1.0, -0.9, 0.0,
-        1.0, 1.0, 0.0]
+        -1.0, -1.0, 0.0, 1.0,
+        1.0, -1.0, 0.0, 1.0,
+        0.0, 1.0, 0.0, 1.0]
     
     /// Constructor
     init(width: UInt, height: UInt)
@@ -34,9 +34,19 @@ class MyMTKView: MTKView
         let vertex_func = library.newFunctionWithName("vertex_main")!
         let frag_func = library.newFunctionWithName("fragment_main")!
         
+        // The code below describes the vertex layout in the buffer. Note, that 
+        // the code runs fine without, so it seems that the defaults are sane.
+        let vertex_desc = MTLVertexDescriptor()
+        vertex_desc.attributes[0].offset = 0
+        vertex_desc.attributes[0].format = .Float4
+        vertex_desc.attributes[0].bufferIndex = 0
+        vertex_desc.layouts[0].stepFunction = .PerVertex
+        vertex_desc.layouts[0].stride = 4 * sizeof(Float32)
+        
         // Now, we initializat the Metal render pipeline descriptor and associate the shader
         // functions with the pipeline. We also need to set the pixel format.
         let pipeline_desc = MTLRenderPipelineDescriptor()
+        pipeline_desc.vertexDescriptor = vertex_desc
         pipeline_desc.vertexFunction = vertex_func
         pipeline_desc.fragmentFunction = frag_func
         pipeline_desc.colorAttachments[0].pixelFormat = .BGRA8Unorm
