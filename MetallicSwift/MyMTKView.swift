@@ -32,12 +32,12 @@ class MyMTKView: MTKView
         // init MTKView - this involves creating a Metal device
         super.init(frame: CGRect(x: 0,y: 0,width: 500,height: 500), device: MTLCreateSystemDefaultDevice())
         
-        library = device!.newDefaultLibrary()!
+        library = device!.makeDefaultLibrary()!
         
         // We compute the data size and create a buffer for our vertices. We copy
         // the vertices to that buffer in the same instance.
-        let data_size = vertex_data.count * sizeofValue(vertex_data[0])
-        vertex_buffer = device!.newBufferWithBytes(vertex_data, length: data_size, options: .CPUCacheModeWriteCombined)
+        let data_size = vertex_data.count * MemoryLayout.size(ofValue: vertex_data[0])
+        vertex_buffer = device!.makeBuffer(bytes: vertex_data, length: data_size, options: .cpuCacheModeWriteCombined)
         
         init_graphics_pipeline()
     }
@@ -49,17 +49,17 @@ class MyMTKView: MTKView
         // Create a library of metal shader functions. As far as I can tell, all the functions
         // in the metal files are simply put into this library. From the library we then
         // get the vertex and fragment shader functions.
-        let vertex_func = library.newFunctionWithName("vertex_main")!
-        let frag_func = library.newFunctionWithName("fragment_main")!
+        let vertex_func = library.makeFunction(name: "vertex_main")!
+        let frag_func = library.makeFunction(name: "fragment_main")!
         
         // The code below describes the vertex layout in the buffer. Note, that
         // the code runs fine without, so it seems that the defaults are sane.
         let vertex_desc = MTLVertexDescriptor()
         vertex_desc.attributes[0].offset = 0
-        vertex_desc.attributes[0].format = .Float4
+        vertex_desc.attributes[0].format = .float4
         vertex_desc.attributes[0].bufferIndex = 0
-        vertex_desc.layouts[0].stepFunction = .PerVertex
-        vertex_desc.layouts[0].stride = 4 * sizeof(Float32)
+        vertex_desc.layouts[0].stepFunction = .perVertex
+        vertex_desc.layouts[0].stride = 4 * MemoryLayout<Float32>.size
         
         // Now, we initializat the Metal render pipeline descriptor and associate the shader
         // functions with the pipeline. We also need to set the pixel format.
@@ -67,12 +67,12 @@ class MyMTKView: MTKView
         pipeline_desc.vertexDescriptor = vertex_desc
         pipeline_desc.vertexFunction = vertex_func
         pipeline_desc.fragmentFunction = frag_func
-        pipeline_desc.colorAttachments[0].pixelFormat = .BGRA8Unorm
+        pipeline_desc.colorAttachments[0].pixelFormat = .bgra8Unorm
         
         // The pipeline descriptor is now used to create a pipeline state object. The precise
         // difference between the descriptor and the state is a bit hazy to me.
         do {
-            try pipeline_state = device!.newRenderPipelineStateWithDescriptor(pipeline_desc)
+            try pipeline_state = device!.makeRenderPipelineState(descriptor: pipeline_desc)
         }
         catch {
             print("Creating pipeline state failed")
@@ -83,19 +83,19 @@ class MyMTKView: MTKView
         tessellation and geometry shading needs to happen in compute shaders */
     func compute_pipeline()
     {
-        let trans_func = library.newFunctionWithName("transform")
+        let trans_func = library.makeFunction(name: "transform")
         let pipeline_desc = MTLComputePipelineDescriptor()
         pipeline_desc.computeFunction = trans_func
         do {
-            try compute_pipeline_state = device!.newComputePipelineStateWithFunction(trans_func!)
+            try compute_pipeline_state = device!.makeComputePipelineState(function: trans_func!)
         }
         catch {
             print("Creating compute pipeline state failed")
         }
-        let command_buffer = device!.newCommandQueue().commandBuffer()
-        let command_encoder = command_buffer.computeCommandEncoder()
+        let command_buffer = device!.makeCommandQueue()!.makeCommandBuffer()!
+        let command_encoder = command_buffer.makeComputeCommandEncoder()!
         command_encoder.setComputePipelineState(compute_pipeline_state)
-        command_encoder.setBuffer(vertex_buffer, offset: 0, atIndex: 0)
+        command_encoder.setBuffer(vertex_buffer, offset: 0, index: 0)
         
         let threads_per_group = MTLSize(width: 3,height: 1,depth: 1)
         let thread_groups = MTLSize(width: 1, height: 1, depth: 1)
@@ -110,7 +110,7 @@ class MyMTKView: MTKView
         self.init(width:500,height:500)
     }
     
-    override func drawRect(dirtyRect: CGRect)
+    override func draw(_ dirtyRect: CGRect)
     {
         compute_pipeline() // Rotate triangle
         
@@ -126,14 +126,14 @@ class MyMTKView: MTKView
                 
                 // Next, we create the command buffer, queue, and encoder. These objects together
                 // encapsulate the actual submission of graphics commands to the GPU.
-                let command_buffer = device!.newCommandQueue().commandBuffer()
-                let command_encoder = command_buffer.renderCommandEncoderWithDescriptor(pass_descriptor)
+                let command_buffer = device!.makeCommandQueue()!.makeCommandBuffer()!
+                let command_encoder = command_buffer.makeRenderCommandEncoder(descriptor: pass_descriptor)!
                 
                 command_encoder.setRenderPipelineState(pipeline_state)
-                command_encoder.setVertexBuffer(vertex_buffer, offset: 0, atIndex: 0)
-                command_encoder.drawPrimitives(.Triangle, vertexStart: 0, vertexCount: 3, instanceCount: 1)
+                command_encoder.setVertexBuffer(vertex_buffer, offset: 0, index: 0)
+                command_encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3, instanceCount: 1)
                 command_encoder.endEncoding()
-                command_buffer.presentDrawable(drawable)
+                command_buffer.present(drawable)
                 command_buffer.commit()
             }
         }
